@@ -1,0 +1,35 @@
+name: Bot ICT SMC Trading Alerts
+
+on:
+  # 1. Exécution automatique aux 3 Killzones ICT (Heures UTC : 08:00, 13:30, 16:00)
+  schedule:
+    - cron: '0 8 * * *'    # 08:00 UTC (London Open)
+    - cron: '30 13 * * *'  # 13:30 UTC (New York Open)
+    - cron: '0 16 * * *'   # 16:00 UTC (New York Close)
+  
+  # 2. Permet de lancer le bot manuellement depuis GitHub quand vous voulez
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code de la repository
+        uses: actions/checkout@v3
+
+      - name: Configurer Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Exécuter le script de trading
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python main.py
