@@ -1,13 +1,11 @@
 name: Bot ICT SMC Trading Alerts
 
 on:
-  # 1. Exécution automatique aux 3 Killzones ICT (Heures UTC : 08:00, 13:30, 16:00)
   schedule:
-    - cron: '0 8 * * *'    # 08:00 UTC (London Open)
-    - cron: '30 13 * * *'  # 13:30 UTC (New York Open)
-    - cron: '0 16 * * *'   # 16:00 UTC (New York Close)
+    - cron: '0 8 * * *'    # 08:00 UTC (11:00 Madagascar)
+    - cron: '30 13 * * *'  # 13:30 UTC (16:30 Madagascar)
+    - cron: '0 16 * * *'   # 16:00 UTC (19:00 Madagascar)
   
-  # 2. Permet de déclencher le bot manuellement depuis GitHub quand vous voulez
   workflow_dispatch:
 
 jobs:
@@ -16,10 +14,10 @@ jobs:
 
     steps:
       - name: Récupérer le code de la repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configurer Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
