@@ -43,7 +43,7 @@ async def send_signal():
         print(f"⚠️ Erreur EUR/USD : {e}")
         eur_price = 1.0850
 
-    # Calculs Niveaux EUR/USD
+    # Calculs Niveaux EUR/USD (Stratégie SHORT / VENTE)
     eur_entry = round(eur_price - 0.0001, 5)
     eur_sl = round(eur_entry + EUR_SL_PIPS, 5)
     eur_tp = round(eur_entry - (EUR_SL_PIPS * RISK_REWARD), 5)
@@ -59,28 +59,30 @@ async def send_signal():
         print(f"⚠️ Erreur Gold : {e}")
         gold_price = 2350.00
 
-    # Calculs Niveaux GOLD
+    # Calculs Niveaux GOLD (Stratégie SHORT / VENTE)
     gold_entry = round(gold_price - 0.10, 2)
     gold_sl = round(gold_entry + GOLD_SL_POINTS, 2)
     gold_tp = round(gold_entry - (GOLD_SL_POINTS * RISK_REWARD), 2)
 
-    # 5. Composition du message Telegram combiné
+    # 5. Composition du message Telegram combiné avec VENTE / BUY bien visibles
     msg = (
-        f"🚨 *SIGNAUX ICT SMC SHORT* 🚨\n"
+        f"🚨 *SIGNAUX ICT SMC TRADING* 🚨\n"
         f"🕒 *Exécution :* {heure_str} (Heure Mada)\n\n"
         f"-----------------------------------\n"
-        f"💶 *PAIRE : EUR/USD*\n"
-        f"📦 *Lot :* {LOT_SIZE}\n"
-        f"📉 *Entrée :* `{eur_entry}`\n"
-        f"🛑 *Stop Loss :* `{eur_sl}` (-15 pips / -1.50$)\n"
-        f"🎯 *Take Profit :* `{eur_tp}` (+30 pips / +3.00$)\n\n"
+        f"💶 *ACTIF : EUR/USD*\n"
+        f"🔴 *ORDRE : VENDRE (SELL / SHORT)*\n"
+        f"📦 *Lot recommandé :* {LOT_SIZE}\n\n"
+        f"🎯 *Prix d'entrée (SELL) :* `{eur_entry}`\n"
+        f"🛑 *Stop Loss (SL) :* `{eur_sl}` (-15 pips / -1.50$)\n"
+        f"🟢 *Take Profit (TP) :* `{eur_tp}` (+30 pips / +3.00$)\n\n"
         f"-----------------------------------\n"
         f"🏆 *ACTIF : GOLD (XAU/USD)*\n"
-        f"📦 *Lot :* {LOT_SIZE}\n"
-        f"📉 *Entrée :* `{gold_entry}`\n"
-        f"🛑 *Stop Loss :* `{gold_sl}` (-1.50$)\n"
-        f"🎯 *Take Profit :* `{gold_tp}` (+3.00$)\n\n"
-        f"⚡ *Zone :* Rejet Premium OTE / FVG détecté."
+        f"🔴 *ORDRE : VENDRE (SELL / SHORT)*\n"
+        f"📦 *Lot recommandé :* {LOT_SIZE}\n\n"
+        f"🎯 *Prix d'entrée (SELL) :* `{gold_entry}`\n"
+        f"🛑 *Stop Loss (SL) :* `{gold_sl}` (-1.50$)\n"
+        f"🟢 *Take Profit (TP) :* `{gold_tp}` (+3.00$)\n\n"
+        f"⚡ *Analyse :* Premium OTE Zone & FVG détectés."
     )
 
     # 6. Envoi du message Telegram
@@ -88,7 +90,7 @@ async def send_signal():
     try:
         bot = Bot(token=TELEGRAM_TOKEN)
         await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="Markdown")
-        print(f"🎉 SUCCÈS : Signaux EUR/USD et GOLD envoyés à {heure_str} !")
+        print(f"🎉 SUCCÈS : Signaux de VENTE envoyés à {heure_str} !")
     except Exception as e:
         print(f"❌ ERREUR TELEGRAM : {e}")
         sys.exit(1)
