@@ -1,99 +1,101 @@
 import os
-import sys
-from datetime import datetime, timezone, timedelta
-import pandas as pd
-import yfinance as yf
-from telegram import Bot
-import asyncio
+import requests
+from datetime import datetime, timedelta
+import pytz
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+# Configuration des variables d'environnement
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# Paramètres généraux
-LOT_SIZE = "0.01"
-RISK_REWARD = 2.0
+def send_telegram_message(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("❌ Erreur: Tokens Telegram non configurés.")
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    response = requests.post(url, json=payload)
+    if response.status_code == 200:
+        print("✅ Message envoyé sur Telegram avec succès.")
+    else:
+        print(f"❌ Échec de l'envoi: {response.text}")
 
-# Paramètres EUR/USD
-EUR_SL_PIPS = 0.0015  # 15 pips (-1.50$)
-
-# Paramètres GOLD (XAU/USD)
-GOLD_SL_POINTS = 1.50 # 1.50$ de variation (-1.50$)
-
-async def send_signal():
-    # 1. Calcul de l'heure locale de Madagascar (UTC+3)
-    madagascar_tz = timezone(timedelta(hours=3))
-    now_mada = datetime.now(madagascar_tz)
-    heure_str = now_mada.strftime("%d/%m/%Y à %H:%M:%S")
-
-    print(f"--- DÉBUT D'EXÉCUTION DU BOT ({heure_str}) ---")
-    
-    # 2. Vérification des Secrets GitHub
-    if not TELEGRAM_TOKEN or not CHAT_ID:
-        print("❌ ERREUR CRITIQUE : Les secrets TELEGRAM_TOKEN et CHAT_ID ne sont pas configurés.")
-        sys.exit(1)
-
-    # 3. Récupération des données EUR/USD
-    print("📥 Récupération des données EUR/USD...")
+def get_economic_news():
+    """
+    Récupère les événements économiques majeurs du jour (USD & EUR)
+    """
     try:
-        df_eur = yf.download("EURUSD=X", period="5d", interval="1h")
-        if isinstance(df_eur.columns, pd.MultiIndex):
-            df_eur.columns = df_eur.columns.get_level_values(0)
-        eur_price = round(df_eur["Close"].iloc[-1], 5)
+        # Source calendrier économique léger et gratuit
+        url = "https://nws.s3-us-west-2.amazonaws.com/economic_calendar.json"
+        response = requests.get(url, timeout=10)
+        
+        # Formatage par défaut si indisponible ou simplifié
+        today_str = datetime.now(pytz.timezone('Africa/Nairobi')).strftime("%Y-%d-%m")
+        return "📅 *Pensez à vérifier Forex Factory / TradingView Calendar pour les dossiers Rouges (USD/EUR) de la journée.*"
     except Exception as e:
-        print(f"⚠️ Erreur EUR/USD : {e}")
-        eur_price = 1.0850
+        return "⚠️ *Calendrier Economic non disponible à cette heure. Vérifiez ForexFactory.com.*"
 
-    # Calculs Niveaux EUR/USD (Stratégie SHORT / VENTE)
-    eur_entry = round(eur_price - 0.0001, 5)
-    eur_sl = round(eur_entry + EUR_SL_PIPS, 5)
-    eur_tp = round(eur_entry - (EUR_SL_PIPS * RISK_REWARD), 5)
+def build_session_alert(event_type):
+    mada_tz = pytz.timezone('Africa/Nairobi')
+    now_mada = datetime.now(mada_tz)
+    date_str = now_mada.strftime("%d/%m/%Y")
+    time_str = now_mada.strftime("%H:%M")
 
-    # 4. Récupération des données GOLD (XAU/USD)
-    print("📥 Récupération des données GOLD...")
-    try:
-        df_gold = yf.download("GC=F", period="5d", interval="1h")
-        if isinstance(df_gold.columns, pd.MultiIndex):
-            df_gold.columns = df_gold.columns.get_level_values(0)
-        gold_price = round(df_gold["Close"].iloc[-1], 2)
-    except Exception as e:
-        print(f"⚠️ Erreur Gold : {e}")
-        gold_price = 2350.00
+    if event_type == "morning":
+        msg = (
+            f"🌅 *BONJOUR & BRIEFING DU MATIN* — {date_str}\n"
+            f"───────────────\n"
+            f"⏰ *Heure Mada :* {time_str} EAT\n\n"
+            f"📊 *Objectif du Jour :*\n"
+            f"• Analyse uniquement sur TradingView (UTC+3)\n"
+            f"• Attendre la création de FVG / Liquidity Sweep\n"
+            f"• Respecter scrupuleusement la règle No-News!\n\n"
+            f"⚠️ *RAPPEL NEWS DU JOUR :*\n"
+            f"Vérifiez vos dossiers Rouges 🔴 (USD / EUR) sur Forex Factory avant de prendre toute position."
+        )
+    elif event_type == "london_open":
+        msg = (
+            f"🔔 *KILLZONE : LONDON OPEN (11:00 EAT)*\n"
+            f"───────────────\n"
+            f"🏛️ *Market Status :* Ouverture de Londres\n"
+            f"🎯 *Actifs cibles :* EUR/USD & XAU/USD\n\n"
+            f"📋 *Checklist ICT/SMC :*\n"
+            f"1️⃣ Prise de liquidité d'Asie (Asian High/Low) ?\n"
+            f"2️⃣ Displacements M5/M15 détectés ?\n"
+            f"3️⃣ FVG / Order Block clair pour l'entrée ?\n"
+            f"4️⃣ Pas de news Majeure EUR à venir dans les 15 min ?"
+        )
+    elif event_type == "ny_open":
+        msg = (
+            f"🔔 *KILLZONE : NEW YORK OPEN (16:30 EAT)*\n"
+            f"───────────────\n"
+            f"🗽 *Market Status :* Ouverture Wall Street & Session US\n"
+            f"🎯 *Actifs cibles :* EUR/USD & XAU/USD\n\n"
+            f"⚠️ *ATTENTION VOLATILITÉ :*\n"
+            f"• La session NY génère les plus gros mouvements sur le GOLD.\n"
+            f"• Vérifiez impérativement les News US de 08:30 AM EST (15:30/16:30 Mada) !\n"
+            f"• Si pas de configuration SMC propre ➔ Ne pas forcer."
+        )
+    elif event_type == "london_close":
+        msg = (
+            f"🔔 *KILLZONE : LONDON CLOSE / NY PM (19:00 EAT)*\n"
+            f"───────────────\n"
+            f"📉 *Market Status :* Clôture de Londres & Continuation US\n"
+            f"⚠️ *Prudence :* Volume en baisse sur EUR/USD.\n"
+            f"• Préférez sécuriser vos positions en cours (BE / Partial TP)."
+        )
+    else:
+        msg = f"ℹ️ *Alerte Session ICT* - {time_str} EAT"
 
-    # Calculs Niveaux GOLD (Stratégie SHORT / VENTE)
-    gold_entry = round(gold_price - 0.10, 2)
-    gold_sl = round(gold_entry + GOLD_SL_POINTS, 2)
-    gold_tp = round(gold_entry - (GOLD_SL_POINTS * RISK_REWARD), 2)
-
-    # 5. Composition du message Telegram combiné avec VENTE / BUY bien visibles
-    msg = (
-        f"🚨 *SIGNAUX ICT SMC TRADING* 🚨\n"
-        f"🕒 *Exécution :* {heure_str} (Heure Mada)\n\n"
-        f"-----------------------------------\n"
-        f"💶 *ACTIF : EUR/USD*\n"
-        f"🔴 *ORDRE : VENDRE (SELL / SHORT)*\n"
-        f"📦 *Lot recommandé :* {LOT_SIZE}\n\n"
-        f"🎯 *Prix d'entrée (SELL) :* `{eur_entry}`\n"
-        f"🛑 *Stop Loss (SL) :* `{eur_sl}` (-15 pips / -1.50$)\n"
-        f"🟢 *Take Profit (TP) :* `{eur_tp}` (+30 pips / +3.00$)\n\n"
-        f"-----------------------------------\n"
-        f"🏆 *ACTIF : GOLD (XAU/USD)*\n"
-        f"🔴 *ORDRE : VENDRE (SELL / SHORT)*\n"
-        f"📦 *Lot recommandé :* {LOT_SIZE}\n\n"
-        f"🎯 *Prix d'entrée (SELL) :* `{gold_entry}`\n"
-        f"🛑 *Stop Loss (SL) :* `{gold_sl}` (-1.50$)\n"
-        f"🟢 *Take Profit (TP) :* `{gold_tp}` (+3.00$)\n\n"
-        f"⚡ *Analyse :* Premium OTE Zone & FVG détectés."
-    )
-
-    # 6. Envoi du message Telegram
-    print("📤 Envoi du signal combiné à Telegram...")
-    try:
-        bot = Bot(token=TELEGRAM_TOKEN)
-        await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="Markdown")
-        print(f"🎉 SUCCÈS : Signaux de VENTE envoyés à {heure_str} !")
-    except Exception as e:
-        print(f"❌ ERREUR TELEGRAM : {e}")
-        sys.exit(1)
+    return msg
 
 if __name__ == "__main__":
-    asyncio.run(send_signal())
+    import sys
+    # On passe le type d'événement en argument lors de l'exécution
+    event_type = sys.argv[1] if len(sys.argv) > 1 else "morning"
+    
+    alert_message = build_session_alert(event_type)
+    send_telegram_message(alert_message)
