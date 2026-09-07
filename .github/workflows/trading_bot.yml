@@ -1,0 +1,32 @@
+name: Trading Signal Bot
+
+on:
+  schedule:
+    # S'exécute automatiquement toutes les heures (00:00, 01:00, 02:00...)
+    - cron: '0 * * * *'
+  # Permet aussi de déclencher manuellement le script depuis l'interface GitHub
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code du dépôt
+        uses: actions/checkout@v3
+
+      - name: Configurer Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Exécuter le Bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bot.py
