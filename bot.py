@@ -2,15 +2,14 @@ import os
 import requests
 import pandas as pd
 import ta
+import yfinance as yf
 
 # --- CONFIGURATION DU BOT ---
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# Sur OKX, la paire s'écrit EUR-USDT
-SYMBOL = "EUR-USDT"  
-INTERVAL = "1H"     # 1 heure sur OKX
-LIMIT = 100         # Nombre de bougies
+# Ticker Yahoo Finance pour la paire EUR/USD
+SYMBOL = "EURUSD=X"
 
 def send_telegram_message(message):
     """Envoie un message formaté sur Telegram"""
@@ -26,37 +25,17 @@ def send_telegram_message(message):
     requests.post(url, json=payload)
 
 def get_market_data():
-    """Récupère les données OHLCV publiques depuis l'API Spot de OKX"""
-    url = f"https://www.okx.com/api/v5/market/candles?instId={SYMBOL}&bar={INTERVAL}&limit={LIMIT}"
+    """Récupère l'historique horaire depuis Yahoo Finance"""
+    ticker = yf.Ticker(SYMBOL)
+    # Récupère 7 jours de données en intervalle 1 heure (1h)
+    df = ticker.history(period="7d", interval="1h")
     
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    
-    response = requests.get(url, headers=headers, timeout=10)
-    
-    if response.status_code != 200:
-        raise ValueError(f"Erreur API OKX (Code {response.status_code}) : {response.text}")
-        
-    data = response.json()
-    
-    if data.get("code") != "0" or not data.get("data"):
-        raise ValueError(f"Impossible de récupérer les données OKX pour {SYMBOL} : {data.get('msg')}")
+    if df.empty:
+        raise ValueError(f"Impossible de récupérer les données yfinance pour {SYMBOL}.")
 
-    # OKX renvoie les données sous forme: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
-    raw_list = data["data"]
+    # On nettoie le nom des colonnes en minuscules
+    df.columns = [c.lower() for c in df.columns]
     
-    # Inverser la liste pour remettre dans l'ordre chronologique
-    raw_list.reverse()
-
-    df = pd.DataFrame(raw_list, columns=[
-        'timestamp', 'open', 'high', 'low', 'close', 'volume', 'volCcy', 'volCcyQuote', 'confirm'
-    ])
-    
-    # Conversion des colonnes financières en float
-    for col in ['open', 'high', 'low', 'close']:
-        df[col] = df[col].astype(float)
-        
     return df
 
 def analyze_market(df):
@@ -101,11 +80,11 @@ def main():
         if signal != "NONE":
             message = (
                 f"⚡ *NOUVEAU SIGNAL DE TRADING* ⚡\n\n"
-                f"💱 **Paire :** `EUR/USDT`\n"
+                f"💱 **Paire :** `EUR/USD`\n"
                 f"🎯 **Action :** *{signal}*\n\n"
-                f"📌 **Prix d'entrée :** `{entry:.5f}` USDT\n"
-                f"🛑 **Stop Loss (SL) :** `{sl:.5f}` USDT\n"
-                f"🎯 **Take Profit (TP) :** `{tp:.5f}` USDT\n\n"
+                f"📌 **Prix d'entrée :** `{entry:.5f}`\n"
+                f"🛑 **Stop Loss (SL) :** `{sl:.5f}`\n"
+                f"🎯 **Take Profit (TP) :** `{tp:.5f}`\n\n"
                 f"📊 *Indicateurs :*\n"
                 f"• RSI (14) : `{rsi}`\n"
                 f"• SMA (50) : `{sma:.5f}`"
@@ -113,7 +92,7 @@ def main():
             send_telegram_message(message)
             print(f"Signal {signal} envoyé sur Telegram !")
         else:
-            print(f"Analyse réussie via OKX. Pas de signal actuellement (RSI: {rsi}, Prix: {entry:.5f}).")
+            print(f"Analyse réussie via yfinance. Pas de signal actuellement (RSI: {rsi}, Prix: {entry:.5f}).")
             
     except Exception as e:
         error_msg = f"⚠️ Erreur lors de l'exécution du Bot : {e}"
