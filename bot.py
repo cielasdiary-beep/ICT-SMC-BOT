@@ -8,8 +8,8 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 SYMBOL = "EURUSDT"  # Paire Euro / Tether USD
-INTERVAL = "1h"     # Graphique 1 heure
-LIMIT = 200         # Historique pour le calcul des indicateurs
+INTERVAL = "60"     # 60 minutes (1 heure sur Bybit)
+LIMIT = 200         # Nombre de bougies
 
 def send_telegram_message(message):
     """Envoie un message formaté sur Telegram"""
@@ -25,28 +25,30 @@ def send_telegram_message(message):
     requests.post(url, json=payload)
 
 def get_market_data():
-    """Récupère les données OHLCV de Binance avec un User-Agent valide"""
-    url = f"https://api.binance.com/api/v3/klines?symbol={SYMBOL}&interval={INTERVAL}&limit={LIMIT}"
+    """Récupère les données OHLCV publiques depuis l'API de Bybit (non restreinte sur GitHub)"""
+    url = f"https://api.bybit.com/v5/market/kline?category=spot&symbol={SYMBOL}&interval={INTERVAL}&limit={LIMIT}"
     
-    # Ajout de headers pour simuler un navigateur et éviter le blocage API Binance
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
     
     response = requests.get(url, headers=headers)
     
     if response.status_code != 200:
-        raise ValueError(f"Erreur API Binance (Code {response.status_code}) : {response.text}")
+        raise ValueError(f"Erreur API (Code {response.status_code}) : {response.text}")
         
     data = response.json()
     
-    if not isinstance(data, list) or len(data) == 0:
-        raise ValueError(f"Réponse API invalide ou vide de Binance pour {SYMBOL}.")
+    if data.get("retCode") != 0 or not data.get("result", {}).get("list"):
+        raise ValueError(f"Impossible de récupérer les données pour {SYMBOL} : {data.get('retMsg')}")
 
-    df = pd.DataFrame(data, columns=[
-        'timestamp', 'open', 'high', 'low', 'close', 'volume',
-        'close_time', 'qav', 'num_trades', 'taker_base_vol', 'taker_quote_vol', 'ignore'
-    ])
+    # Bybit renvoie les bougies dans cet ordre : [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover]
+    raw_list = data["result"]["list"]
+    
+    # Inverser la liste pour avoir l'ordre chronologique (du plus ancien au plus récent)
+    raw_list.reverse()
+
+    df = pd.DataFrame(raw_list, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
     
     # Conversion des colonnes financières en float
     for col in ['open', 'high', 'low', 'close']:
@@ -108,7 +110,7 @@ def main():
             send_telegram_message(message)
             print(f"Signal {signal} envoyé sur Telegram !")
         else:
-            print(f"Analyse réussie pour {SYMBOL}. Pas de signal (RSI: {rsi}, Prix: {entry:.5f}).")
+            print(f"Analyse réussie pour {SYMBOL}. Pas de signal actuellement (RSI: {rsi}, Prix: {entry:.5f}).")
             
     except Exception as e:
         error_msg = f"⚠️ Erreur lors de l'exécution du Bot : {e}"
