@@ -7,9 +7,10 @@ import ta
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-SYMBOL = "EURUSDT"  # Paire Euro / Tether USD
-INTERVAL = "60"     # 60 minutes (1 heure sur Bybit)
-LIMIT = 200         # Nombre de bougies
+# Sur OKX, la paire s'écrit EUR-USDT
+SYMBOL = "EUR-USDT"  
+INTERVAL = "1H"     # 1 heure sur OKX
+LIMIT = 100         # Nombre de bougies
 
 def send_telegram_message(message):
     """Envoie un message formaté sur Telegram"""
@@ -25,30 +26,32 @@ def send_telegram_message(message):
     requests.post(url, json=payload)
 
 def get_market_data():
-    """Récupère les données OHLCV publiques depuis l'API de Bybit (non restreinte sur GitHub)"""
-    url = f"https://api.bybit.com/v5/market/kline?category=spot&symbol={SYMBOL}&interval={INTERVAL}&limit={LIMIT}"
+    """Récupère les données OHLCV publiques depuis l'API Spot de OKX"""
+    url = f"https://www.okx.com/api/v5/market/candles?instId={SYMBOL}&bar={INTERVAL}&limit={LIMIT}"
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=10)
     
     if response.status_code != 200:
-        raise ValueError(f"Erreur API (Code {response.status_code}) : {response.text}")
+        raise ValueError(f"Erreur API OKX (Code {response.status_code}) : {response.text}")
         
     data = response.json()
     
-    if data.get("retCode") != 0 or not data.get("result", {}).get("list"):
-        raise ValueError(f"Impossible de récupérer les données pour {SYMBOL} : {data.get('retMsg')}")
+    if data.get("code") != "0" or not data.get("data"):
+        raise ValueError(f"Impossible de récupérer les données OKX pour {SYMBOL} : {data.get('msg')}")
 
-    # Bybit renvoie les bougies dans cet ordre : [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover]
-    raw_list = data["result"]["list"]
+    # OKX renvoie les données sous forme: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+    raw_list = data["data"]
     
-    # Inverser la liste pour avoir l'ordre chronologique (du plus ancien au plus récent)
+    # Inverser la liste pour remettre dans l'ordre chronologique
     raw_list.reverse()
 
-    df = pd.DataFrame(raw_list, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'])
+    df = pd.DataFrame(raw_list, columns=[
+        'timestamp', 'open', 'high', 'low', 'close', 'volume', 'volCcy', 'volCcyQuote', 'confirm'
+    ])
     
     # Conversion des colonnes financières en float
     for col in ['open', 'high', 'low', 'close']:
@@ -98,7 +101,7 @@ def main():
         if signal != "NONE":
             message = (
                 f"⚡ *NOUVEAU SIGNAL DE TRADING* ⚡\n\n"
-                f"💱 **Paire :** `{SYMBOL}`\n"
+                f"💱 **Paire :** `EUR/USDT`\n"
                 f"🎯 **Action :** *{signal}*\n\n"
                 f"📌 **Prix d'entrée :** `{entry:.5f}` USDT\n"
                 f"🛑 **Stop Loss (SL) :** `{sl:.5f}` USDT\n"
@@ -110,7 +113,7 @@ def main():
             send_telegram_message(message)
             print(f"Signal {signal} envoyé sur Telegram !")
         else:
-            print(f"Analyse réussie pour {SYMBOL}. Pas de signal actuellement (RSI: {rsi}, Prix: {entry:.5f}).")
+            print(f"Analyse réussie via OKX. Pas de signal actuellement (RSI: {rsi}, Prix: {entry:.5f}).")
             
     except Exception as e:
         error_msg = f"⚠️ Erreur lors de l'exécution du Bot : {e}"
