@@ -9,7 +9,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 SYMBOL = "EURUSDT"  # Paire Euro / Tether USD
 INTERVAL = "1h"     # Graphique 1 heure
-LIMIT = 200         # Augmenté à 200 pour s'assurer d'avoir assez d'historique
+LIMIT = 200         # Historique pour le calcul des indicateurs
 
 def send_telegram_message(message):
     """Envoie un message formaté sur Telegram"""
@@ -25,9 +25,19 @@ def send_telegram_message(message):
     requests.post(url, json=payload)
 
 def get_market_data():
-    """Récupère les données OHLCV de Binance pour la paire EURUSDT"""
+    """Récupère les données OHLCV de Binance avec un User-Agent valide"""
     url = f"https://api.binance.com/api/v3/klines?symbol={SYMBOL}&interval={INTERVAL}&limit={LIMIT}"
-    response = requests.get(url)
+    
+    # Ajout de headers pour simuler un navigateur et éviter le blocage API Binance
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        raise ValueError(f"Erreur API Binance (Code {response.status_code}) : {response.text}")
+        
     data = response.json()
     
     if not isinstance(data, list) or len(data) == 0:
@@ -46,15 +56,12 @@ def get_market_data():
 
 def analyze_market(df):
     """Calcule le RSI, la SMA50 et l'ATR pour évaluer le marché"""
-    # 1. Calcul des indicateurs
     df['rsi'] = ta.momentum.rsi(df['close'], window=14)
     df['sma50'] = ta.trend.sma_indicator(df['close'], window=50)
     df['atr'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)
     
-    # Supression des lignes avec des valeurs non calculables (NaN)
     df_clean = df.dropna().copy()
     
-    # Sécurité : vérifier qu'il reste suffisamment de données
     if len(df_clean) < 1:
         raise ValueError("Pas assez de données valides après le calcul des indicateurs.")
 
@@ -68,7 +75,7 @@ def analyze_market(df):
     sl = 0.0
     tp = 0.0
     
-    # 2. Logique de Signal + Calcul SL / TP avec Ratio 1:2
+    # Logique de Signal + Calcul SL / TP avec Ratio 1:2
     if rsi < 35 and entry_price < sma:
         signal_type = "BUY 🟢"
         sl = entry_price - (1.5 * atr)
@@ -86,7 +93,6 @@ def main():
         df = get_market_data()
         entry, rsi, sma, signal, sl, tp = analyze_market(df)
         
-        # Si un signal BUY ou SELL est généré
         if signal != "NONE":
             message = (
                 f"⚡ *NOUVEAU SIGNAL DE TRADING* ⚡\n\n"
@@ -102,7 +108,7 @@ def main():
             send_telegram_message(message)
             print(f"Signal {signal} envoyé sur Telegram !")
         else:
-            print(f"Analyse réussie. Pas de signal fort détecté (RSI: {rsi}, Prix: {entry:.5f}).")
+            print(f"Analyse réussie pour {SYMBOL}. Pas de signal (RSI: {rsi}, Prix: {entry:.5f}).")
             
     except Exception as e:
         error_msg = f"⚠️ Erreur lors de l'exécution du Bot : {e}"
