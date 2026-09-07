@@ -2,9 +2,7 @@ name: Trading Signal Bot
 
 on:
   schedule:
-    # S'exécute automatiquement toutes les heures (00:00, 01:00, 02:00...)
     - cron: '0 * * * *'
-  # Permet de déclencher le bot manuellement depuis l'interface GitHub
   workflow_dispatch:
 
 jobs:
@@ -23,7 +21,7 @@ jobs:
       - name: Installer les dépendances directement
         run: |
           python -m pip install --upgrade pip
-          pip install pandas ta requests
+          pip install pandas ta requests yfinance
 
       - name: Exécuter le Bot
         env:
